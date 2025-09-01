@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+
+{% block title %}User {{ user.user_id }} - Telegram Moderator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-user me-2"></i>Користувач {{ user.get_display_name|default:user.user_id }}</h1>
+    <a href="{% url 'users_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Назад до списку
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <!-- Профіль користувача -->
+        <div class="card mb-3">
+            <div class="card-body text-center">
+                <div class="user-avatar mx-auto mb-3" style="width: 80px; height: 80px; font-size: 2rem;">
+                    {{ user.first_name|first|default:user.user_id|first }}
+                </div>
+                <h5>{{ user.get_display_name }}</h5>
+                <p class="text-muted">ID: {{ user.user_id }}</p>
+
+                {% if is_moderator %}
+                    <span class="badge bg-success mb-2">
+                        <i class="fas fa-shield-alt"></i> Модератор
+                    </span>
+                {% endif %}
+
+                <p><small class="text-muted">Останній візит: {{ user.last_seen|timesince }} тому</small></p>
+            </div>
+        </div>
+
+        <!-- Швидкі дії -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-bolt me-2"></i>Швидкі дії</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-warning btn-sm" onclick="quickAction('warn')">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Попередження
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="quickAction('mute')">
+                        <i class="fas fa-volume-mute me-2"></i>Мут
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="quickAction('ban')">
+                        <i class="fas fa-ban me-2"></i>Бан
+                    </button>
+                    <hr>
+                    <button class="btn btn-success btn-sm" onclick="quickAction('unwarn')">
+                        <i class="fas fa-undo me-2"></i>Зняти попередження
+                    </button>
+                    <button class="btn btn-info btn-sm" onclick="quickAction('unmute')">
+                        <i class="fas fa-volume-up me-2"></i>Розмутити
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" onclick="quickAction('unban')">
+                        <i class="fas fa-unlock me-2"></i>Розбанити
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <!-- Статистика попереджень -->
+        {% if warnings %}
+        <div class="row mb-3">
+            {% for warning in warnings %}
+            <div class="col-md-6 mb-2">
+                <div class="alert alert-warning">
+                    <strong>Чат ID:</strong> {{ warning.chat_id }}<br>
+                    <strong>Попереджень:</strong> {{ warning.warn_count }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Активні бани -->
+        {% if bans %}
+        <div class="card mb-3">
+            <div class="card-header bg-danger text-white">
+                <h6><i class="fas fa-ban me-2"></i>Активні бани</h6>
+            </div>
+            <div class="card-body">
+                {% for ban in bans %}
+                <div class="alert alert-danger">
+                    <strong>Чат:</strong> {{ ban.chat_id }}<br>
+                    <strong>Причина:</strong> {{ ban.reason }}
+                    <button class="btn btn-sm btn-outline-success float-end" onclick="unbanUser({{ ban.chat_id }})">
+                        <i class="fas fa-unlock"></i> Розбанити
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Історія покарань -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-history me-2"></i>Історія покарань</h6>
+            </div>
+            <div class="card-body">
+                {% if punishments %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Тип</th>
+                                <th>Причина</th>
+                                <th>Чат</th>
+                                <th>Модератор</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for punishment in punishments %}
+                            <tr>
+                                <td>
+                                    <small>{{ punishment.timestamp|date:"d.m.Y H:i" }}</small>
+                                </td>
+                                <td>
+                                    {% if punishment.punishment_type == 'ban' %}
+                                        <span class="badge bg-danger">Бан</span>
+                                    {% elif punishment.punishment_type == 'warn' %}
+                                        <span class="badge bg-warning">Попередження</span>
+                                    {% elif punishment.punishment_type == 'mute' %}
+                                        <span class="badge bg-secondary">Мут</span>
+                                    {% elif punishment.punishment_type == 'kick' %}
+                                        <span class="badge bg-info">Кік</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ punishment.reason|truncatechars:50 }}</small>
+                                </td>
+                                <td>
+                                    <code>{{ punishment.chat_id }}</code>
+                                </td>
+                                <td>
+                                    <small>{{ punishment.moderator_id }}</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                    У користувача немає покарань
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для швидких дій -->
+<div class="modal fade" id="quickActionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Дія</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="quickActionForm">
+                <div class="modal-body">
+                    <input type="hidden" id="actionType">
+                    <input type="hidden" id="userId" value="{{ user.user_id }}">
+
+                    <div class="mb-3">
+                        <label for="chatId" class="form-label">ID чату</label>
+                        <input type="number" class="form-control" id="chatId" required>
+                    </div>
+
+                    <div class="mb-3" id="reasonField">
+                        <label for="actionReason" class="form-label">Причина</label>
+                        <textarea class="form-control" id="actionReason" rows="3"></textarea>
+                    </div>
+
+                    <div class="mb-3" id="durationField" style="display: none;">
+                        <label for="muteDuration" class="form-label">Тривалість муту (хвилини)</label>
+                        <input type="number" class="form-control" id="muteDuration" min="1" max="43200">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                    <button type="submit" class="btn btn-primary" id="submitAction">Виконати</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function quickAction(action) {
+    const modal = new bootstrap.Modal(document.getElementById('quickActionModal'));
+    const actionType = document.getElementById('actionType');
+    const modalTitle = document.getElementById('modalTitle');
+    const reasonField = document.getElementById('reasonField');
+    const durationField = document.getElementById('durationField');
+    const submitBtn = document.getElementById('submitAction');
+
+    actionType.value = action;
+
+    const actionNames = {
+        'warn': 'Попередження',
+        'mute': 'Мут',
+        'ban': 'Бан',
+        'unwarn': 'Зняти попередження',
+        'unmute': 'Розмутити',
+        'unban': 'Розбанити'
+    };
+
+    modalTitle.textContent = actionNames[action];
+
+    // Показать поле причины только для наказаний
+    if (['warn', 'mute', 'ban'].includes(action)) {
+        reasonField.style.display = 'block';
+        document.getElementById('actionReason').required = true;
+    } else {
+        reasonField.style.display = 'none';
+        document.getElementById('actionReason').required = false;
+    }
+
+    // Показать поле длительности только для мута
+    if (action === 'mute') {
+        durationField.style.display = 'block';
+        document.getElementById('muteDuration').required = true;
+    } else {
+        durationField.style.display = 'none';
+        document.getElementById('muteDuration').required = false;
+    }
+
+    // Изменить цвет кнопки
+    submitBtn.className = 'btn ' + {
+        'warn': 'btn-warning',
+        'mute': 'btn-secondary',
+        'ban': 'btn-danger',
+        'unwarn': 'btn-success',
+        'unmute': 'btn-info',
+        'unban': 'btn-success'
+    }[action];
+
+    modal.show();
+}
+
+document.getElementById('quickActionForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append('action', document.getElementById('actionType').value);
+    formData.append('user_id', document.getElementById('userId').value);
+    formData.append('chat_id', document.getElementById('chatId').value);
+    formData.append('reason', document.getElementById('actionReason').value);
+
+    if (document.getElementById('actionType').value === 'mute') {
+        formData.append('duration', document.getElementById('muteDuration').value);
+    }
+
+    try {
+        const response = await fetch('{% url "moderation_actions" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Помилка виконання дії');
+        }
+    } catch (error) {
+        alert('Помилка: ' + error.message);
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('quickActionModal')).hide();
+});
+
+function unbanUser(chatId) {
+    if (confirm('Розбанити користувача в цьому чаті?')) {
+        quickAction('unban');
+        document.getElementById('chatId').value = chatId;
+    }
+}
+</script>
+{% endblock %}

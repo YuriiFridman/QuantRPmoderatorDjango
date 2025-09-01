@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics - Telegram Moderator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-chart-bar me-2"></i>Аналітика</h1>
+    <div class="btn-group">
+        <a href="?days=7" class="btn btn-outline-primary {% if days == 7 %}active{% endif %}">7 днів</a>
+        <a href="?days=30" class="btn btn-outline-primary {% if days == 30 %}active{% endif %}">30 днів</a>
+        <a href="?days=90" class="btn btn-outline-primary {% if days == 90 %}active{% endif %}">90 днів</a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Статистика по типам покарань -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-pie me-2"></i>Типи покарань</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="punishmentChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Топ модераторів -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-trophy me-2"></i>Топ модераторів</h5>
+            </div>
+            <div class="card-body">
+                {% for moderator in top_moderators %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>
+                        <i class="fas fa-user-shield me-2"></i>
+                        ID: {{ moderator.moderator_id }}
+                    </span>
+                    <span class="badge bg-primary">{{ moderator.count }} дій</span>
+                </div>
+                {% empty %}
+                <p class="text-muted text-center">Немає даних</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Статистика за період -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line me-2"></i>Активність за період</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="activityChart" width="400" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Додаткова статистика -->
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle me-2"></i>Загальна статистика</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    {% for punishment_type, count in punishment_stats.items %}
+                    <div class="col-6 mb-3">
+                        <div class="p-2 border rounded">
+                            {% if punishment_type == 'ban' %}
+                                <i class="fas fa-ban text-danger fa-2x"></i>
+                                <h6 class="mt-1">Бани</h6>
+                            {% elif punishment_type == 'warn' %}
+                                <i class="fas fa-exclamation-triangle text-warning fa-2x"></i>
+                                <h6 class="mt-1">Попередження</h6>
+                            {% elif punishment_type == 'mute' %}
+                                <i class="fas fa-volume-mute text-secondary fa-2x"></i>
+                                <h6 class="mt-1">Мути</h6>
+                            {% elif punishment_type == 'kick' %}
+                                <i class="fas fa-door-open text-info fa-2x"></i>
+                                <h6 class="mt-1">Кіки</h6>
+                            {% endif %}
+                            <h4 class="text-primary">{{ count }}</h4>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-download me-2"></i>Експорт даних</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-sm" onclick="exportData('csv')">
+                        <i class="fas fa-file-csv me-2"></i>Експорт CSV
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="exportData('json')">
+                        <i class="fas fa-file-code me-2"></i>Експорт JSON
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+// Круговая диаграмма типов покарань
+const punishmentData = {
+    labels: [
+        {% for punishment_type, count in punishment_stats.items %}
+        '{{ punishment_type|capfirst }}',
+        {% endfor %}
+    ],
+    datasets: [{
+        data: [
+            {% for punishment_type, count in punishment_stats.items %}
+            {{ count }},
+            {% endfor %}
+        ],
+        backgroundColor: [
+            '#dc3545', // ban - red
+            '#ffc107', // warn - yellow
+            '#6c757d', // mute - gray
+            '#17a2b8'  // kick - blue
+        ]
+    }]
+};
+
+new Chart(document.getElementById('punishmentChart'), {
+    type: 'doughnut',
+    data: punishmentData,
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// График активности (заглушка для примера)
+const activityData = {
+    labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'],
+    datasets: [{
+        label: 'Количество действий',
+        data: [12, 19, 3, 5, 2, 3, 7],
+        borderColor: '#667eea',
+        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+        tension: 0.4
+    }]
+};
+
+new Chart(document.getElementById('activityChart'), {
+    type: 'line',
+    data: activityData,
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+function exportData(format) {
+    const url = `/api/export/${format}/?days={{ days }}`;
+    window.open(url, '_blank');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings - Telegram Moderator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-cog me-2"></i>Налаштування</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Настройки чатов -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-comments me-2"></i>Налаштування чатів</h5>
+            </div>
+            <div class="card-body">
+                {% if chat_settings %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID чату</th>
+                                <th>Фільтр слів</th>
+                                <th>Привітання</th>
+                                <th>Дії</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for setting in chat_settings %}
+                            <tr>
+                                <td><code>{{ setting.chat_id }}</code></td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="filter_{{ setting.chat_id }}"
+                                               {% if setting.filter_enabled %}checked{% endif %}
+                                               onchange="toggleSetting({{ setting.chat_id }}, 'filter', this.checked)">
+                                        <label class="form-check-label" for="filter_{{ setting.chat_id }}">
+                                            {% if setting.filter_enabled %}Увімкнено{% else %}Вимкнено{% endif %}
+                                        </label>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="welcome_{{ setting.chat_id }}"
+                                               {% if setting.welcome_enabled %}checked{% endif %}
+                                               onchange="toggleSetting({{ setting.chat_id }}, 'welcome', this.checked)">
+                                        <label class="form-check-label" for="welcome_{{ setting.chat_id }}">
+                                            {% if setting.welcome_enabled %}Увімкнено{% else %}Вимкнено{% endif %}
+                                        </label>
+                                    </div>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editChatSettings({{ setting.chat_id }})">
+                                        <i class="fas fa-edit"></i> Редагувати
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-comments fa-3x mb-3 d-block"></i>
+                    Немає налаштованих чатів
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Заборонені слова -->
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-ban me-2"></i>Заборонені слова</h5>
+            </div>
+            <div class="card-body">
+                <form id="forbiddenWordsForm">
+                    <div class="mb-3">
+                        <label for="forbiddenWords" class="form-label">Список заборонених слів (одне на рядок)</label>
+                        <textarea class="form-control" id="forbiddenWords" rows="10"
+                                  placeholder="спам&#10;реклама&#10;..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Зберегти
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Швидкі налаштування -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6><i class="fas fa-bolt me-2"></i>Швидкі налаштування</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-sm" onclick="bulkAction('enable_filter')">
+                        <i class="fas fa-filter me-2"></i>Увімкнути фільтр у всіх чатах
+                    </button>
+                    <button class="btn btn-warning btn-sm" onclick="bulkAction('disable_filter')">
+                        <i class="fas fa-filter me-2"></i>Вимкнути фільтр у всіх чатах
+                    </button>
+                    <hr>
+                    <button class="btn btn-info btn-sm" onclick="bulkAction('enable_welcome')">
+                        <i class="fas fa-hand-wave me-2"></i>Увімкнути привітання у всіх чатах
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="bulkAction('disable_welcome')">
+                        <i class="fas fa-hand-wave me-2"></i>Вимкнути привітання у всіх чатах
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Інформація про систему -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-info-circle me-2"></i>Система</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <i class="fas fa-circle text-success me-2"></i>
+                    <strong>Статус бота:</strong> Активний
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-database me-2"></i>
+                    <strong>База даних:</strong> Підключена
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-shield-alt me-2"></i>
+                    <strong>Автомодерація:</strong> Увімкнена
+                </div>
+                <hr>
+                <div class="d-grid">
+                    <button class="btn btn-danger btn-sm" onclick="restartBot()">
+                        <i class="fas fa-redo me-2"></i>Перезапустити бота
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Загрузка запрещенных слов при открытии страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadForbiddenWords();
+});
+
+async function toggleSetting(chatId, setting, enabled) {
+    const formData = new FormData();
+    formData.append('chat_id', chatId);
+    formData.append(setting + '_enabled', enabled ? 'on' : '');
+
+    try {
+        const response = await fetch('{% url "settings" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+
+        if (response.ok) {
+            // Обновить текст лейбла
+            const label = document.querySelector(`label[for="${setting}_${chatId}"]`);
+            label.textContent = enabled ? 'Увімкнено' : 'Вимкнено';
+        } else {
+            alert('Помилка збереження налаштувань');
+            // Откатить переключатель
+            document.getElementById(`${setting}_${chatId}`).checked = !enabled;
+        }
+    } catch (error) {
+        alert('Помилка: ' + error.message);
+        document.getElementById(`${setting}_${chatId}`).checked = !enabled;
+    }
+}
+
+async function loadForbiddenWords() {
+    try {
+        const response = await fetch('/api/forbidden-words/');
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('forbiddenWords').value = data.words.join('\n');
+        }
+    } catch (error) {
+        console.error('Помилка завантаження заборонених слів:', error);
+    }
+}
+
+async function saveForbiddenWords(words) {
+    try {
+        const response = await fetch('/api/forbidden-words/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                words: words.split('\n').filter(word => word.trim())
+            })
+        });
+
+        if (response.ok) {
+            alert('Список заборонених слів збережено');
+        } else {
+            alert('Помилка збереження');
+        }
+    } catch (error) {
+        alert('Помилка: ' + error.message);
+    }
+}
+
+document.getElementById('forbiddenWordsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const words = document.getElementById('forbiddenWords').value;
+    saveForbiddenWords(words);
+});
+
+function editChatSettings(chatId) {
+    // Перенаправить на страницу редактирования настроек чата
+    window.location.href = `/chat/${chatId}/settings/`;
+}
+
+function bulkAction(action) {
+    if (!confirm('Ви впевнені, що хочете виконати цю дію для всіх чатів?')) {
+        return;
+    }
+
+    // Здесь будет логика массовых действий
+    alert(`Дія "${action}" буде виконана для всіх чатів`);
+}
+
+function restartBot() {
+    if (!confirm('Ви впевнені, що хочете перезапустити бота? Це може зайняти декілька хвилин.')) {
+        return;
+    }
+
+    alert('Перезапуск бота...');
+    // Здесь будет логика перезапуска
+}
+</script>
+{% endblock %}

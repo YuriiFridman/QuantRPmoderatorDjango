@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block title %}Moderation Actions - Telegram Moderator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-gavel me-2"></i>Модераторські дії</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-user-times me-2"></i>Модерувати користувача</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="moderationForm">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="user_id" class="form-label">ID користувача</label>
+                        <input type="number" class="form-control" id="user_id" name="user_id" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="chat_id" class="form-label">ID чату</label>
+                        <input type="number" class="form-control" id="chat_id" name="chat_id" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="action" class="form-label">Дія</label>
+                        <select class="form-select" id="action" name="action" required>
+                            <option value="">Виберіть дію</option>
+                            <option value="warn">⚠️ Попередження</option>
+                            <option value="mute">🔇 Мут</option>
+                            <option value="ban">🚫 Бан</option>
+                            <option value="kick">🚪 Кік</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="durationField" style="display: none;">
+                        <label for="duration" class="form-label">Тривалість (хвилини)</label>
+                        <input type="number" class="form-control" id="duration" name="duration" min="1" max="43200">
+                        <div class="form-text">Тільки для муту. Максимум 43200 хвилин (30 днів)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">Причина</label>
+                        <textarea class="form-control" id="reason" name="reason" rows="3" required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <h6>Швидкі причини:</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-reason" data-reason="Спам">Спам</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-reason" data-reason="Ненормативна лексика">Мат</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-reason" data-reason="Реклама">Реклама</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-reason" data-reason="Оскорбления">Оскорблення</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-reason" data-reason="Флуд">Флуд</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-reason" data-reason="Порушення правил">Порушення правил</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check me-2"></i>Виконати дію
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-undo me-2"></i>Скасувати покарання</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="removeActionForm">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="remove_user_id" class="form-label">ID користувача</label>
+                        <input type="number" class="form-control" id="remove_user_id" name="user_id" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="remove_chat_id" class="form-label">ID чату</label>
+                        <input type="number" class="form-control" id="remove_chat_id" name="chat_id" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="remove_action" class="form-label">Скасувати</label>
+                        <select class="form-select" id="remove_action" name="action" required>
+                            <option value="">Виберіть дію</option>
+                            <option value="unban">🔓 Розбанити</option>
+                            <option value="unmute">🔊 Розмутити</option>
+                            <option value="unwarn">✅ Зняти попередження</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-undo me-2"></i>Скасувати покарання
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-search me-2"></i>Перевірити користувача</h5>
+            </div>
+            <div class="card-body">
+                <form id="checkUserForm">
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="check_user_id" placeholder="ID користувача" required>
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </form>
+                <div id="userInfo" class="mt-3" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Показать поле длительности для мута
+document.getElementById('action').addEventListener('change', function() {
+    const durationField = document.getElementById('durationField');
+    if (this.value === 'mute') {
+        durationField.style.display = 'block';
+        document.getElementById('duration').required = true;
+    } else {
+        durationField.style.display = 'none';
+        document.getElementById('duration').required = false;
+    }
+});
+
+// Быстрые причины
+document.querySelectorAll('.quick-reason').forEach(button => {
+    button.addEventListener('click', function() {
+        document.getElementById('reason').value = this.dataset.reason;
+    });
+});
+
+// Проверка пользователя
+document.getElementById('checkUserForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const userId = document.getElementById('check_user_id').value;
+    const userInfo = document.getElementById('userInfo');
+
+    try {
+        const response = await axios.get(`/api/user/${userId}/`);
+        const data = response.data;
+
+        let html = `
+            <div class="alert alert-info">
+                <h6><i class="fas fa-user me-2"></i>Користувач ID: ${data.user_id}</h6>
+                <p><strong>Модератор:</strong> ${data.is_moderator ? 'Так' : 'Ні'}</p>
+                <p><strong>Кількість покарань:</strong> ${data.punishments.length}</p>
+            </div>
+        `;
+
+        if (data.punishments.length > 0) {
+            html += '<h6>Останні покарання:</h6><ul class="list-group list-group-flush">';
+            data.punishments.slice(0, 5).forEach(punishment => {
+                html += `
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span><strong>${punishment.punishment_type}</strong>: ${punishment.reason}</span>
+                        <small class="text-muted">${new Date(punishment.timestamp).toLocaleString()}</small>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+        }
+
+        userInfo.innerHTML = html;
+        userInfo.style.display = 'block';
+    } catch (error) {
+        userInfo.innerHTML = '<div class="alert alert-danger">Помилка завантаження даних користувача</div>';
+        userInfo.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}
