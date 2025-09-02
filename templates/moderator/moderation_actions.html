@@ -23,8 +23,15 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="chat_id" class="form-label">ID чату</label>
-                        <input type="number" class="form-control" id="chat_id" name="chat_id" required>
+                        <label for="chat_id" class="form-label">Чат</label>
+                        <select class="form-select" id="chat_id" name="chat_id" required>
+                            <option value="">Виберіть чат...</option>
+                            {% for chat in chats %}
+                                <option value="{{ chat.chat_id }}">
+                                    {{ chat.chat_title|default:chat.chat_id }}
+                                </option>
+                            {% endfor %}
+                        </select>
                     </div>
 
                     <div class="mb-3">
@@ -84,13 +91,20 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="remove_chat_id" class="form-label">ID чату</label>
-                        <input type="number" class="form-control" id="remove_chat_id" name="chat_id" required>
+                        <label for="remove_chat_id" class="form-label">Чат</label>
+                        <select class="form-select" id="remove_chat_id" name="chat_id" required>
+                            <option value="">Виберіть чат...</option>
+                            {% for chat in chats %}
+                                <option value="{{ chat.chat_id }}">
+                                    {{ chat.chat_title|default:chat.chat_id }}
+                                </option>
+                            {% endfor %}
+                        </select>
                     </div>
 
                     <div class="mb-3">
                         <label for="remove_action" class="form-label">Скасувати</label>
-                        <select class="form-select" id="remove_action" name="action" required>
+                        <select class="form-select" id="remove_action" name="remove_action" required>
                             <option value="">Виберіть дію</option>
                             <option value="unban">🔓 Розбанити</option>
                             <option value="unmute">🔊 Розмутити</option>

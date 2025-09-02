@@ -16,6 +16,7 @@ import json
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.core.paginator import Paginator
+from .database import ModerationTask
 
 
 @login_required
@@ -76,48 +77,112 @@ def user_detail(request, user_id):
 
 @login_required
 def moderation_actions(request):
-    """Страница модераторских действий"""
+    """Страница модераторских действий: наказания и их отмена"""
+
+    chats = ChatSetting.objects.all()  # Для выпадающего списка чатов
+
     if request.method == 'POST':
-        action = request.POST.get('action')
-        user_id = int(request.POST.get('user_id'))
-        chat_id = int(request.POST.get('chat_id', 0))
-        reason = request.POST.get('reason', 'No reason provided')
-        duration = request.POST.get('duration')
+        # Основная форма наказания
+        if 'action' in request.POST and 'user_id' in request.POST and 'chat_id' in request.POST:
+            action = request.POST.get('action')
+            user_id = int(request.POST.get('user_id'))
+            chat_id = int(request.POST.get('chat_id', 0))
+            reason = request.POST.get('reason', 'No reason provided')
+            duration = request.POST.get('duration')
 
-        # Здесь будет асинхронный вызов функций бота
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
-        try:
-            if action == 'ban':
-                loop.run_until_complete(db_manager.add_ban(user_id, chat_id, reason))
-                loop.run_until_complete(db_manager.add_punishment(
-                    user_id, chat_id, 'ban', reason, request.user.id
-                ))
-                messages.success(request, f'User {user_id} banned successfully')
+            try:
+                if action == 'ban':
+                    loop.run_until_complete(db_manager.add_ban(user_id, chat_id, reason))
+                    loop.run_until_complete(db_manager.add_punishment(
+                        user_id, chat_id, 'ban', reason, request.user.id
+                    ))
+                    messages.success(request, f'User {user_id} banned successfully')
 
-            elif action == 'warn':
-                warn_count = loop.run_until_complete(db_manager.add_warning(user_id, chat_id))
-                loop.run_until_complete(db_manager.add_punishment(
-                    user_id, chat_id, 'warn', reason, request.user.id
-                ))
-                messages.success(request, f'Warning added. Total warnings: {warn_count}')
+                elif action == 'warn':
+                    warn_count = loop.run_until_complete(db_manager.add_warning(user_id, chat_id))
+                    loop.run_until_complete(db_manager.add_punishment(
+                        user_id, chat_id, 'warn', reason, request.user.id
+                    ))
+                    messages.success(request, f'Warning added. Total warnings: {warn_count}')
 
-            elif action == 'mute':
-                duration_minutes = int(duration) if duration else 60
-                loop.run_until_complete(db_manager.add_punishment(
-                    user_id, chat_id, 'mute', reason, request.user.id, duration_minutes
-                ))
-                messages.success(request, f'User {user_id} muted for {duration_minutes} minutes')
+                elif action == 'mute':
+                    duration_minutes = int(duration) if duration else 60
+                    loop.run_until_complete(db_manager.add_punishment(
+                        user_id, chat_id, 'mute', reason, request.user.id, duration_minutes
+                    ))
+                    messages.success(request, f'User {user_id} muted for {duration_minutes} minutes')
 
-        except Exception as e:
-            messages.error(request, f'Error: {str(e)}')
-        finally:
-            loop.close()
+                elif action == 'kick':
+                    loop.run_until_complete(db_manager.add_punishment(
+                        user_id, chat_id, 'kick', reason, request.user.id
+                    ))
+                    messages.success(request, f'User {user_id} kicked')
 
-        return redirect('moderation_actions')
+                # Формируем ModerationTask для воркера
+                task = ModerationTask(
+                    task_type=action,
+                    user_id=user_id,
+                    username=None,
+                    reason=reason,
+                    chat_id=chat_id,
+                    moderator_id=request.user.id,
+                    duration_minutes=int(duration) if action == 'mute' and duration else None
+                )
+                db_manager.add_to_queue(task)
 
-    return render(request, 'moderator/moderation_actions.html')
+            except Exception as e:
+                messages.error(request, f'Error: {str(e)}')
+            finally:
+                loop.close()
+
+            return redirect('moderation_actions')
+
+        # Форма отмены наказания
+        elif 'remove_action' in request.POST and 'user_id' in request.POST and 'chat_id' in request.POST:
+            action = request.POST.get('remove_action')  # unban, unmute, unwarn
+            user_id = int(request.POST.get('user_id'))
+            chat_id = int(request.POST.get('chat_id'))
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                # Формируем ModerationTask для отмены наказания
+                task = ModerationTask(
+                    task_type=action,
+                    user_id=user_id,
+                    username=None,
+                    reason=None,
+                    chat_id=chat_id,
+                    moderator_id=request.user.id,
+                    duration_minutes=None
+                )
+                db_manager.add_to_queue(task)
+
+                # Для unwarn — удаляем предупреждение в БД
+                if action == 'unwarn':
+                    loop.run_until_complete(db_manager.remove_warning(user_id, chat_id))
+                    messages.success(request, f'Warning removed from user {user_id}')
+                elif action == 'unban':
+                    loop.run_until_complete(db_manager.remove_ban(user_id, chat_id))
+                    messages.success(request, f'Ban removed from user {user_id}')
+                elif action == 'unmute':
+                    loop.run_until_complete(db_manager.remove_mute(user_id, chat_id))
+                    messages.success(request, f'Mute removed from user {user_id}')
+                else:
+                    messages.success(request, f'Action {action} queued for user {user_id}')
+
+            except Exception as e:
+                messages.error(request, f'Error: {str(e)}')
+            finally:
+                loop.close()
+
+            return redirect('moderation_actions')
+
+    return render(request, 'moderator/moderation_actions.html', {'chats': chats})
 
 
 @api_view(['POST'])

@@ -1,9 +1,14 @@
 import os
 from pathlib import Path
+
+import redis
+from django.conf import settings
+import self
 from decouple import config
 import ssl
 import asyncio
 from startup import init_database
+
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -94,5 +99,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50
 }
+
+REDIS_HOST = config('REDIS_HOST', default='modern-molly-9075.upstash.io')
+REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
+REDIS_DB = config('REDIS_DB', default=0, cast=int)
+REDIS_PASSWORD = config('REDIS_PASSWORD', default='ASNzAAImcDE1MjBjNjY4OWEwNTc0M2NmOWFjYzc3OTM5ZGQ5NzZiZXAxOTA3NQ')
 
 asyncio.get_event_loop().run_until_complete(init_database())

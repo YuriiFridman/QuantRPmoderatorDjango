@@ -1,7 +1,10 @@
-import asyncio
 from moderator.database import db_manager
 
 async def init_database():
-    """Инициализация подключения к базе данных при запуске Django"""
-    await db_manager.init_db()
-    print("Database connection pool initialized")
+    # Більше не ініціалізуємо пул на старті.
+    # Пулі створюються ліниво у відповідному event loop при першому зверненні.
+    return
+
+async def shutdown_database():
+    # Опційно викликайте це у lifespan/shutdown, щоб закрити всі пулі
+    await db_manager.close_all()

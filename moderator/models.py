@@ -18,6 +18,7 @@ class Ban(models.Model):
 # Соответствует вашей таблице chat_settings
 class ChatSetting(models.Model):
     chat_id = models.BigIntegerField(primary_key=True)
+    chat_title = models.CharField(max_length=255, blank=True, null=True)
     filter_enabled = models.BooleanField(default=True)
 
     class Meta:
