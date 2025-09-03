@@ -18,7 +18,8 @@ import asyncio
 import json
 import hmac
 import hashlib
-from datetime import datetime, timedelta, time
+import time  # ВАЖЛИВО: використовуємо stdlib time
+from datetime import datetime, timedelta  # НЕ імпортуємо `time` звідси!
 
 from .models import *
 from .database import db_manager, ModerationTask
@@ -28,32 +29,41 @@ from .database import db_manager, ModerationTask
 TELEGRAM_BOT_TOKEN = getattr(settings, "TELEGRAM_BOT_TOKEN", None)
 
 def check_telegram_auth(querydict, bot_token):
-    """Перевірка автентичності даних Telegram Login Widget"""
+    """
+    Перевірка автентичності даних Telegram Login Widget (згідно з офіційною документацією).
+    """
     if not bot_token:
         return False
 
-    # Витягуємо РЯДКОВІ значення (а не списки)
+    # Витягуємо РЯДКОВІ значення з QueryDict
     data = {k: querydict.get(k) for k in querydict.keys()}
 
     received_hash = data.pop('hash', '')
     if not received_hash:
         return False
 
-    # Формуємо data_check_string згідно з документацією Telegram
-    auth_data_sorted = sorted(f"{k}={v}" for k, v in data.items() if v is not None)
-    data_check_string = "\n".join(auth_data_sorted)
+    # Формуємо data_check_string: сортуємо саме за КЛЮЧАМИ
+    parts = []
+    for k in sorted(data.keys()):
+        v = data[k]
+        if v is not None:
+            parts.append(f"{k}={v}")
+    data_check_string = "\n".join(parts)
 
     secret_key = hashlib.sha256(bot_token.encode()).digest()
     my_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
-    # Необов’язково: перевірка "свіжості" підпису (наприклад, 1 день)
+    # Перевірка "свіжості" підпису (рекомендовано Telegram)
     try:
         auth_ts = int(data.get('auth_date', '0'))
+        # 86400 секунд = 24 години
         if abs(int(time.time()) - auth_ts) > 86400:
             return False
     except Exception:
+        # Якщо не змогли прочитати auth_date — не валимо, але краще логувати
         pass
 
+    # Constant-time порівняння
     return hmac.compare_digest(my_hash, received_hash)
 
 
@@ -61,11 +71,10 @@ def check_telegram_auth(querydict, bot_token):
 @require_http_methods(["GET"])
 def telegram_auth(request):
     """Вхід через Telegram Login Widget"""
-    # Спочатку перевіряємо підпис
     if not check_telegram_auth(request.GET, TELEGRAM_BOT_TOKEN):
         return HttpResponse("Auth failed", status=403)
 
-    # А потім розбираємо дані
+    # Після валідації підпису дістаємо поля
     try:
         telegram_id = int(request.GET.get('id', '0'))
     except (TypeError, ValueError):
@@ -78,7 +87,7 @@ def telegram_auth(request):
     moderator = Moderator.objects.filter(user_id=telegram_id).first()
     if moderator:
         from django.contrib.auth.models import User
-        user, created = User.objects.get_or_create(username=str(telegram_id))
+        user, _ = User.objects.get_or_create(username=str(telegram_id))
         user.first_name = first_name or ""
         user.last_name = last_name or ""
         user.save()
