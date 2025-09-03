@@ -28,16 +28,39 @@
                     <tr>
                         <th>ID користувача</th>
                         <th>Ім'я користувача</th>
+                        <th>Обліковий запис Django</th>
                         <th>Дії</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for moderator in moderators %}
+                    {% for item in moderators_data %}
                     <tr>
-                        <td>{{ moderator.user_id }}</td>
-                        <td>{{ moderator.username|default:"Не вказано" }}</td>
+                        <td>{{ item.moderator.user_id }}</td>
+                        <td>{{ item.moderator.username|default:"Не вказано" }}</td>
                         <td>
-                            <a href="{% url 'delete_moderator' moderator.user_id %}"
+                            {% if item.django_user_exists %}
+                                <span class="badge bg-success">Створено</span>
+                            {% else %}
+                                <span class="badge bg-danger">Не створено</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not item.django_user_exists and item.moderator.username %}
+                                <a href="{% url 'create_django_user' item.moderator.user_id %}"
+                                   class="btn btn-primary btn-sm">
+                                    <i class="fas fa-user-plus"></i> Створити обліковий запис
+                                </a>
+                            {% endif %}
+
+                            {% if item.django_user_exists %}
+                                <a href="{% url 'reset_password' item.moderator.user_id %}"
+                                   class="btn btn-warning btn-sm"
+                                   onclick="return confirm('Ви впевнені, що хочете скинути пароль?')">
+                                    <i class="fas fa-key"></i> Скинути пароль
+                                </a>
+                            {% endif %}
+
+                            <a href="{% url 'delete_moderator' item.moderator.user_id %}"
                                class="btn btn-danger btn-sm"
                                onclick="return confirm('Ви впевнені, що хочете видалити цього модератора?')">
                                 <i class="fas fa-trash"></i> Видалити
@@ -46,7 +69,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="text-center">Модераторів не знайдено</td>
+                        <td colspan="4" class="text-center">Модераторів не знайдено</td>
                     </tr>
                     {% endfor %}
                 </tbody>

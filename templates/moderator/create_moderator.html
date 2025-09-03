@@ -37,9 +37,34 @@
                     <small class="form-text text-muted">Введіть ім'я користувача (username для входу)</small>
                 </div>
 
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="create_django_user" name="create_django_user" onchange="togglePasswordField()">
+                    <label class="form-check-label" for="create_django_user">Створити обліковий запис Django</label>
+                    <small class="form-text text-muted d-block">Увімкніть цю опцію, щоб створити обліковий запис для входу на сайт</small>
+                </div>
+
+                <div class="form-group mb-3" id="password_field" style="display: none;">
+                    <label for="password">Пароль (за бажанням)</label>
+                    <input type="text" class="form-control" id="password" name="password">
+                    <small class="form-text text-muted">Якщо не вказати, буде згенеровано випадковий пароль</small>
+                </div>
+
                 <button type="submit" class="btn btn-primary">Створити модератора</button>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+function togglePasswordField() {
+    const checkbox = document.getElementById('create_django_user');
+    const passwordField = document.getElementById('password_field');
+
+    if (checkbox.checked) {
+        passwordField.style.display = 'block';
+    } else {
+        passwordField.style.display = 'none';
+    }
+}
+</script>
 {% endblock %}
