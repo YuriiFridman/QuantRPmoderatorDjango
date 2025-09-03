@@ -70,10 +70,13 @@
 
                     <div class="telegram-login mt-4 text-center">
                         <span class="text-muted mb-2 d-block">або</span>
-                        <button id="tg-login-btn" class="btn btn-info btn-lg mb-2" style="color: white;">
-                            <i class="fab fa-telegram me-2"></i>Увійти через Telegram
-                        </button>
-                        <div id="tg-widget-container" class="mt-2"></div>
+                        <script async src="https://telegram.org/js/telegram-widget.js?7"
+                                data-telegram-login="QuantRPModerator_bot"
+                                data-size="large"
+                                data-userpic="false"
+                                data-request-access="write"
+                                data-auth-url="{% url 'telegram_auth' %}">
+                        </script>
                         <small class="text-muted d-block mt-2">Вхід через Telegram можливий тільки для модераторів</small>
                     </div>
                 </div>
@@ -82,21 +85,5 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
-    <script>
-        document.getElementById('tg-login-btn').onclick = function() {
-            if (!document.getElementById('tg-widget-script')) {
-                var script = document.createElement('script');
-                script.id = 'tg-widget-script';
-                script.async = true;
-                script.src = "https://telegram.org/js/telegram-widget.js?7";
-                script.setAttribute("data-telegram-login", "QuantRPModerator_bot"); // без @
-                script.setAttribute("data-size", "large");
-                script.setAttribute("data-userpic", "false");
-                script.setAttribute("data-request-access", "write");
-                script.setAttribute("data-auth-url", "{% url 'telegram_auth' %}");
-                document.getElementById('tg-widget-container').appendChild(script);
-            }
-        }
-    </script>
 </body>
 </html>

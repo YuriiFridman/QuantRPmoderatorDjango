@@ -18,7 +18,7 @@ import asyncio
 import json
 import hmac
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 
 from .models import *
 from .database import db_manager, ModerationTask
@@ -27,34 +27,56 @@ from .database import db_manager, ModerationTask
 
 TELEGRAM_BOT_TOKEN = getattr(settings, "TELEGRAM_BOT_TOKEN", None)
 
-def check_telegram_auth(data, bot_token):
+def check_telegram_auth(querydict, bot_token):
     """Перевірка автентичності даних Telegram Login Widget"""
-    auth_data = dict(data)
-    received_hash = auth_data.pop('hash')
-    auth_data_sorted = sorted([f"{k}={v}" for k, v in auth_data.items()])
-    data_check_string = '\n'.join(auth_data_sorted)
+    if not bot_token:
+        return False
+
+    # Витягуємо РЯДКОВІ значення (а не списки)
+    data = {k: querydict.get(k) for k in querydict.keys()}
+
+    received_hash = data.pop('hash', '')
+    if not received_hash:
+        return False
+
+    # Формуємо data_check_string згідно з документацією Telegram
+    auth_data_sorted = sorted(f"{k}={v}" for k, v in data.items() if v is not None)
+    data_check_string = "\n".join(auth_data_sorted)
+
     secret_key = hashlib.sha256(bot_token.encode()).digest()
     my_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    return my_hash == received_hash
+
+    # Необов’язково: перевірка "свіжості" підпису (наприклад, 1 день)
+    try:
+        auth_ts = int(data.get('auth_date', '0'))
+        if abs(int(time.time()) - auth_ts) > 86400:
+            return False
+    except Exception:
+        pass
+
+    return hmac.compare_digest(my_hash, received_hash)
+
 
 @csrf_exempt
 @require_http_methods(["GET"])
 def telegram_auth(request):
     """Вхід через Telegram Login Widget"""
-    data = request.GET
-    telegram_id = int(data.get('id'))
-    username = data.get('username')
-    first_name = data.get('first_name')
-    last_name = data.get('last_name')
-    hash_ = data.get('hash')
-
-    if not TELEGRAM_BOT_TOKEN or not check_telegram_auth(data, TELEGRAM_BOT_TOKEN):
+    # Спочатку перевіряємо підпис
+    if not check_telegram_auth(request.GET, TELEGRAM_BOT_TOKEN):
         return HttpResponse("Auth failed", status=403)
 
-    # Перевірка модератора
+    # А потім розбираємо дані
+    try:
+        telegram_id = int(request.GET.get('id', '0'))
+    except (TypeError, ValueError):
+        return HttpResponse("Bad request", status=400)
+
+    username = request.GET.get('username')
+    first_name = request.GET.get('first_name')
+    last_name = request.GET.get('last_name')
+
     moderator = Moderator.objects.filter(user_id=telegram_id).first()
     if moderator:
-        # Створення або отримання Django-користувача
         from django.contrib.auth.models import User
         user, created = User.objects.get_or_create(username=str(telegram_id))
         user.first_name = first_name or ""
