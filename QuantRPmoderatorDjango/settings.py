@@ -3,7 +3,6 @@ from pathlib import Path
 
 import redis
 from django.conf import settings
-import self
 from decouple import config
 import ssl
 import asyncio
@@ -16,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', config('DOMAIN', default='')]
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', config('DOMAIN', default=''), '*.onrender.com']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
