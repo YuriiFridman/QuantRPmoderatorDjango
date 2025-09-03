@@ -29,7 +29,7 @@ class ChatSetting(models.Model):
 
 # Соответствует вашей таблице moderators
 class Moderator(models.Model):
-    user_id = models.BigIntegerField(unique=True)
+    user_id = models.BigIntegerField(primary_key=True)
     username = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:

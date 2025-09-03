@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load dict_extras %}
 
 {% block title %}Dashboard - Telegram Moderator{% endblock %}
 
@@ -22,7 +23,7 @@
         </div>
     </div>
     <div class="col-md-3 mb-3">
-        <div class="card bg-warning text-dark">
+        <div class="card moder-card">
             <div class="card-body text-center">
                 <i class="fas fa-user-shield fa-2x mb-2"></i>
                 <h3>{{ total_moderators }}</h3>
@@ -73,14 +74,21 @@
                             {% for punishment in recent_punishments %}
                             <tr>
                                 <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="user-avatar me-2">
-                                            {{ punishment.user_id }}
-                                        </div>
-                                        <div>
-                                            <strong>{{ punishment.user_id }}</strong>
-                                        </div>
+                                  <div class="d-flex align-items-center">
+                                    <div class="user-avatar me-2">
                                     </div>
+                                    <div>
+                                      <strong>
+                                        {% with user=user_map|get_item:punishment.user_id %}
+                                          {% if user and user.username %}
+                                            @{{ user.username }} ({{ punishment.user_id }})
+                                          {% else %}
+                                            {{ punishment.user_id }}
+                                          {% endif %}
+                                        {% endwith %}
+                                      </strong>
+                                    </div>
+                                  </div>
                                 </td>
                                 <td>
                                     {% if punishment.punishment_type == 'ban' %}
@@ -113,6 +121,36 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                <!-- Після таблиці -->
+                    {% if recent_punishments.has_other_pages %}
+                    <nav class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if recent_punishments.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ recent_punishments.previous_page_number }}">Попередня</a>
+                                </li>
+                            {% endif %}
+
+                            {% for num in recent_punishments.paginator.page_range %}
+                                {% if recent_punishments.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if recent_punishments.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ recent_punishments.next_page_number }}">Наступна</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
                 </div>
             </div>
         </div>

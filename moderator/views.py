@@ -1,35 +1,127 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.contrib.auth import login
+from django.conf import settings
+from django.utils import timezone
+from django.core.paginator import Paginator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.conf import settings
-from .models import *
-from .database import db_manager
+
 import asyncio
 import json
+import hmac
+import hashlib
 from datetime import datetime, timedelta
-from django.utils import timezone
-from django.core.paginator import Paginator
-from .database import ModerationTask
 
+from .models import *
+from .database import db_manager, ModerationTask
+
+# --- Telegram Auth Widget ---
+
+TELEGRAM_BOT_TOKEN = getattr(settings, "TELEGRAM_BOT_TOKEN", None)
+
+def check_telegram_auth(data, bot_token):
+    """Перевірка автентичності даних Telegram Login Widget"""
+    auth_data = dict(data)
+    received_hash = auth_data.pop('hash')
+    auth_data_sorted = sorted([f"{k}={v}" for k, v in auth_data.items()])
+    data_check_string = '\n'.join(auth_data_sorted)
+    secret_key = hashlib.sha256(bot_token.encode()).digest()
+    my_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    return my_hash == received_hash
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def telegram_auth(request):
+    """Вхід через Telegram Login Widget"""
+    data = request.GET
+    telegram_id = int(data.get('id'))
+    username = data.get('username')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    hash_ = data.get('hash')
+
+    if not TELEGRAM_BOT_TOKEN or not check_telegram_auth(data, TELEGRAM_BOT_TOKEN):
+        return HttpResponse("Auth failed", status=403)
+
+    # Перевірка модератора
+    moderator = Moderator.objects.filter(user_id=telegram_id).first()
+    if moderator:
+        # Створення або отримання Django-користувача
+        from django.contrib.auth.models import User
+        user, created = User.objects.get_or_create(username=str(telegram_id))
+        user.first_name = first_name or ""
+        user.last_name = last_name or ""
+        user.save()
+        login(request, user)
+        return redirect('profile')
+    else:
+        return HttpResponse("Вам доступ заборонено", status=403)
+
+@login_required
+def profile(request):
+    """Профіль модератора з його покараннями"""
+    username = request.user.username
+
+    moderator = Moderator.objects.filter(username=username).first()
+    punishments = None
+
+    if moderator:
+        punishments = Punishment.objects.filter(moderator_id=moderator.user_id).order_by('-timestamp')
+    else:
+        try:
+            telegram_id = int(username)
+            moderator = Moderator.objects.filter(user_id=telegram_id).first()
+            if moderator:
+                punishments = Punishment.objects.filter(moderator_id=telegram_id).order_by('-timestamp')
+        except ValueError:
+            moderator = None
+            punishments = Punishment.objects.none()
+
+    # Мапа chat_id -> chat_title
+    chat_titles = {str(cs.chat_id): cs.chat_title for cs in ChatSetting.objects.all()}
+
+    context = {
+        'moderator': moderator,
+        'punishments': punishments,
+        'chat_titles': chat_titles,
+    }
+    return render(request, 'moderator/profile.html', context)
 
 @login_required
 def dashboard(request):
     """Главная панель"""
+    recent_punishments_all = Punishment.objects.order_by('-timestamp')
+    paginator = Paginator(recent_punishments_all, 20)
+    page = request.GET.get('page')
+    recent_punishments = paginator.get_page(page)
+
+    # Отримати всі user_id, які є у покараннях на поточній сторінці
+    user_ids = [p.user_id for p in recent_punishments]
+    # Створити словник user_id -> TelegramUser об'єкт
+    user_map = {u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids)}
+
+    moderator_map = {
+        m.user_id: (m.username if m.username else str(m.user_id))
+        for m in Moderator.objects.all()
+    }
+
     context = {
         'total_bans': Ban.objects.count(),
         'total_moderators': Moderator.objects.count(),
         'total_chats': ChatSetting.objects.count(),
-        'recent_punishments': Punishment.objects.select_related().order_by('-timestamp')[:10]
+        'recent_punishments': recent_punishments,
+        'moderator_map': moderator_map,
+        'user_map': user_map,
     }
     return render(request, 'moderator/dashboard.html', context)
-
 
 @login_required
 def users_list(request):
@@ -46,16 +138,19 @@ def users_list(request):
             user_id=search_query if search_query.isdigit() else 0
         )
 
-    paginator = Paginator(users, 50)
+    paginator = Paginator(users, 20)
     page = request.GET.get('page')
     users = paginator.get_page(page)
 
+    # Ось це потрібно!
+    moderators_list = list(Moderator.objects.values_list('user_id', flat=True))
+
     context = {
         'users': users,
-        'search_query': search_query
+        'search_query': search_query,
+        'moderators': moderators_list,  # Передаємо список ID
     }
     return render(request, 'moderator/users_list.html', context)
-
 
 @login_required
 def user_detail(request, user_id):
@@ -74,12 +169,19 @@ def user_detail(request, user_id):
     }
     return render(request, 'moderator/user_detail.html', context)
 
-
 @login_required
 def moderation_actions(request):
     """Страница модераторских действий: наказания и их отмена"""
 
     chats = ChatSetting.objects.all()  # Для выпадающего списка чатов
+
+    # Дістаємо Telegram ID модератора
+    try:
+        telegram_id = int(request.user.username)
+        moderator = Moderator.objects.filter(user_id=telegram_id).first()
+    except Exception:
+        moderator = Moderator.objects.filter(username=request.user.username).first()
+        telegram_id = moderator.user_id if moderator else None
 
     if request.method == 'POST':
         # Основная форма наказания
@@ -97,27 +199,27 @@ def moderation_actions(request):
                 if action == 'ban':
                     loop.run_until_complete(db_manager.add_ban(user_id, chat_id, reason))
                     loop.run_until_complete(db_manager.add_punishment(
-                        user_id, chat_id, 'ban', reason, request.user.id
+                        user_id, chat_id, 'ban', reason, telegram_id
                     ))
                     messages.success(request, f'User {user_id} banned successfully')
 
                 elif action == 'warn':
                     warn_count = loop.run_until_complete(db_manager.add_warning(user_id, chat_id))
                     loop.run_until_complete(db_manager.add_punishment(
-                        user_id, chat_id, 'warn', reason, request.user.id
+                        user_id, chat_id, 'warn', reason, telegram_id
                     ))
                     messages.success(request, f'Warning added. Total warnings: {warn_count}')
 
                 elif action == 'mute':
                     duration_minutes = int(duration) if duration else 60
                     loop.run_until_complete(db_manager.add_punishment(
-                        user_id, chat_id, 'mute', reason, request.user.id, duration_minutes
+                        user_id, chat_id, 'mute', reason, telegram_id, duration_minutes
                     ))
                     messages.success(request, f'User {user_id} muted for {duration_minutes} minutes')
 
                 elif action == 'kick':
                     loop.run_until_complete(db_manager.add_punishment(
-                        user_id, chat_id, 'kick', reason, request.user.id
+                        user_id, chat_id, 'kick', reason, telegram_id
                     ))
                     messages.success(request, f'User {user_id} kicked')
 
@@ -128,7 +230,7 @@ def moderation_actions(request):
                     username=None,
                     reason=reason,
                     chat_id=chat_id,
-                    moderator_id=request.user.id,
+                    moderator_id=telegram_id,
                     duration_minutes=int(duration) if action == 'mute' and duration else None
                 )
                 db_manager.add_to_queue(task)
@@ -184,7 +286,6 @@ def moderation_actions(request):
 
     return render(request, 'moderator/moderation_actions.html', {'chats': chats})
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def api_ban_user(request):
@@ -211,7 +312,6 @@ def api_ban_user(request):
     finally:
         loop.close()
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def api_user_info(request, user_id):
@@ -232,7 +332,6 @@ def api_user_info(request, user_id):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     finally:
         loop.close()
-
 
 @login_required
 def analytics(request):
@@ -267,7 +366,6 @@ def analytics(request):
 
     return render(request, 'moderator/analytics.html', context)
 
-
 @login_required
 def settings_view(request):
     """Настройки чатов"""
@@ -291,3 +389,31 @@ def settings_view(request):
     chat_settings = ChatSetting.objects.all()
     context = {'chat_settings': chat_settings}
     return render(request, 'moderator/settings.html', context)
+
+
+@login_required
+def edit_chat_settings(request, chat_id):
+    chat = ChatSetting.objects.filter(chat_id=chat_id).first()
+    if not chat:
+        return HttpResponse("Чат не знайдено", status=404)
+
+    if request.method == 'POST':
+        # Перемикаємо фільтр
+        chat.filter_enabled = not chat.filter_enabled
+        chat.save()
+        messages.success(request, f"Фільтр для чату оновлено: {'Увімкнено' if chat.filter_enabled else 'Вимкнено'}")
+        return redirect('settings')
+
+    return render(request, 'moderator/edit_chat_settings.html', {'chat': chat})
+
+@login_required
+def bulk_filter_toggle(request, action):
+    if action == 'enable':
+        ChatSetting.objects.update(filter_enabled=True)
+        messages.success(request, "Фільтр слів увімкнено у всіх чатах!")
+    elif action == 'disable':
+        ChatSetting.objects.update(filter_enabled=False)
+        messages.success(request, "Фільтр слів вимкнено у всіх чатах!")
+    else:
+        messages.error(request, "Некоректна дія.")
+    return redirect('settings')
