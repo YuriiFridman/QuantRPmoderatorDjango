@@ -76,12 +76,108 @@ def check_telegram_auth(querydict, bot_token):
 
 @xframe_options_exempt
 def tg_login_test(request):
-    """
-    Проста сторінка для діагностики Telegram Login Widget:
-    - показуємо user-об’єкт у браузері при успішній авторизації
-    - даємо кнопку "Продовжити", яка вручну редіректить на /telegram_auth з тим самим набором параметрів
-    """
-    return render(request, 'debug/tg_login_test.html')
+    html = """
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>Telegram Login Test (debug)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial, sans-serif; padding: 20px; }
+    pre { background: #f6f8fa; padding: 12px; border-radius: 8px; overflow: auto; max-height: 280px; }
+    .row { margin: 12px 0; }
+    button { padding: 10px 16px; font-size: 14px; }
+    code { background: #eee; padding: 0 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Telegram Login Test (debug)</h1>
+
+  <ol>
+    <li>Увійдіть у <a href="https://web.telegram.org/" target="_blank" rel="noopener">Telegram Web</a> у цьому браузері.</li>
+    <li>Переконайтесь, що в <a href="https://t.me/QuantRPModerator_bot" target="_blank" rel="noopener">чаті з ботом</a> натиснуто <strong>Start</strong>.</li>
+    <li>Дозвольте попапи і third‑party cookies для <code>*.telegram.org</code>.</li>
+  </ol>
+
+  <div class="row">
+    <script>
+      // Додаткове логування подій від попапа Telegram
+      function log(msg, obj) {
+        const el = document.getElementById('log');
+        const line = document.createElement('div');
+        line.textContent = '[LOG] ' + msg + (obj ? ' ' + JSON.stringify(obj) : '');
+        el.appendChild(line);
+      }
+
+      window.addEventListener('message', (e) => {
+        const rec = {origin: e.origin, data: e.data};
+        log('window.message', rec);
+      });
+
+      window.onerror = function(message, source, lineno, colno, error) {
+        const info = {message, source, lineno, colno};
+        log('window.onerror', info);
+      };
+
+      function onTelegramAuth(user) {
+        const out = document.getElementById('out');
+        out.textContent = JSON.stringify(user, null, 2);
+        window.__tgUser = user;
+        document.getElementById('go-backend').disabled = false;
+        log('onTelegramAuth fired', user);
+      }
+    </script>
+
+    <script async src="https://telegram.org/js/telegram-widget.js?7"
+            data-telegram-login="QuantRPModerator_bot"
+            data-size="large"
+            data-userpic="false"
+            data-auth-url="https://quantrpmoderatordjango.onrender.com/telegram_auth/"
+            data-onauth="onTelegramAuth(user)">
+    </script>
+  </div>
+
+  <div class="row">
+    <button id="go-backend" disabled onclick="
+      try {
+        const user = window.__tgUser || {};
+        const params = new URLSearchParams(user);
+        const url = 'https://quantrpmoderatordjango.onrender.com/telegram_auth/?' + params.toString();
+        window.location.href = url;
+      } catch (e) { console.error(e); alert('Помилка побудови URL'); }
+    ">Продовжити → бекенд (/telegram_auth)</button>
+  </div>
+
+  <div class="row">
+    <strong>user (з Telegram):</strong>
+    <pre id="out">Натисніть кнопку Telegram вище…</pre>
+  </div>
+
+  <hr />
+  <div class="row">
+    <strong>Живий лог подій:</strong>
+    <div id="log" style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:8px;min-height:80px;"></div>
+  </div>
+
+  <hr />
+  <div class="row">
+    <strong>Пряме посилання на OAuth (для тесту):</strong><br/>
+    <a id="oauth-link" href="#" target="_blank" rel="noopener">Відкрити OAuth вручну</a>
+    <script>
+      // BOT ID з getMe: 7797651194
+      const origin = 'https://quantrpmoderatordjango.onrender.com';
+      const oauth = 'https://oauth.telegram.org/auth?bot_id=7797651194&origin=' + encodeURIComponent(origin);
+      document.getElementById('oauth-link').href = oauth;
+    </script>
+    <div style="font-size:12px;color:#666;margin-top:6px;">
+      Якщо при кліку попап відкривається і миттєво закривається, але тут немає подій <code>onTelegramAuth</code> чи <code>window.message</code> — це майже завжди блокування попапів/кукі або неактивний чат із ботом (нема Start).
+    </div>
+  </div>
+</body>
+</html>
+"""
+    return HttpResponse(html)
 
 
 @csrf_exempt
