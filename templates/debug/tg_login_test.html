@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Telegram Login Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, sans-serif; padding: 20px; }
+    pre { background: #f6f8fa; padding: 12px; border-radius: 8px; overflow: auto; }
+    .row { margin: 12px 0; }
+    button { padding: 10px 16px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Telegram Login Test</h1>
+  <p>1) Переконайтесь, що ви увійшли в <a href="https://web.telegram.org/" target="_blank" rel="noopener">Telegram Web</a> у цьому браузері.</p>
+  <p>2) Натисніть кнопку нижче. Якщо авторизація успішна, з’явиться об’єкт user. Потім натисніть “Продовжити”, щоб перейти на бекенд.</p>
+
+  <div id="widget-container" class="row">
+    <script>
+      function onTelegramAuth(user) {
+        const out = document.getElementById('out');
+        out.textContent = JSON.stringify(user, null, 2);
+
+        // Зберігаємо параметри для подальшого редіректу
+        window.__tgUser = user;
+        document.getElementById('go-backend').disabled = false;
+        console.log('onTelegramAuth fired with user:', user);
+      }
+    </script>
+
+    <script async src="https://telegram.org/js/telegram-widget.js?7"
+            data-telegram-login="QuantRPModerator_bot"
+            data-size="large"
+            data-userpic="false"
+            data-request-access="write"
+            data-onauth="onTelegramAuth(user)">
+    </script>
+  </div>
+
+  <div class="row">
+    <button id="go-backend" disabled onclick="
+      try {
+        const user = window.__tgUser || {};
+        const params = new URLSearchParams(user);
+        const url = 'https://quantrpmoderatordjango.onrender.com/telegram_auth/?' + params.toString();
+        window.location.href = url;
+      } catch (e) { console.error(e); alert('Помилка побудови URL'); }
+    ">Продовжити → бекенд (/telegram_auth)</button>
+  </div>
+
+  <div class="row">
+    <strong>user (з Telegram):</strong>
+    <pre id="out">Натисніть кнопку Telegram вище…</pre>
+  </div>
+
+  <hr />
+  <div class="row">
+    <strong>Поради, якщо onAuth не викликається:</strong>
+    <ul>
+      <li>Зайдіть у <a href="https://web.telegram.org/" target="_blank">web.telegram.org</a> і авторизуйтесь.</li>
+      <li>Дозвольте попапи для сайту та тимчасово вимкніть блокування третіх сторінних кукі (Chrome: Settings → Privacy → Third-party cookies).</li>
+      <li>Перевірте, що у BotFather Web Login = quantrpmoderatordjango.onrender.com і бот активний.</li>
+      <li>Переконайтесь, що назва бота у віджеті: QuantRPModerator_bot.</li>
+    </ul>
+  </div>
+</body>
+</html>

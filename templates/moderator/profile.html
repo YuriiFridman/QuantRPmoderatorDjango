@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load dict_extras %}
+{% block content %}
+<h2>Профіль модератора</h2>
+<div>
+    <p><strong>ID Telegram:</strong> {{ moderator.user_id }}</p>
+    <p><strong>Username:</strong> {{ moderator.username }}</p>
+</div>
+<h3>Видані покарання</h3>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Користувач</th>
+            <th>Тип</th>
+            <th>Причина</th>
+            <th>Чат</th>
+            <th>Дата</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for p in punishments %}
+        <tr>
+            <td>{{ p.user_id }}</td>
+            <td>{{ p.punishment_type }}</td>
+            <td>{{ p.reason }}</td>
+            <td>
+                {{ chat_titles|get_item:p.chat_id|default:p.chat_id }}
+            </td>
+            <td>{{ p.timestamp }}</td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="5">Ви ще не видали жодного покарання</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
