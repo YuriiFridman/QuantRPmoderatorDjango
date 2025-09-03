@@ -87,6 +87,18 @@
             height: 32px;
             margin-right: 10px;
         }
+        /* Стилі для адмінського розділу */
+        .admin-section {
+            border-top: 1px solid rgba(255,255,255,0.2);
+            margin-top: 20px;
+            padding-top: 15px;
+        }
+        .admin-nav-link {
+            background-color: rgba(255,69,0,0.2);
+        }
+        .admin-nav-link:hover, .admin-nav-link.active {
+            background-color: rgba(255,69,0,0.4);
+        }
     </style>
 </head>
 <body>
@@ -110,8 +122,6 @@
         <div class="row">
             <!-- Sidebar -->
             <nav class="col-md-3 col-lg-2 sidebar p-3">
-
-
                 <ul class="nav nav-pills flex-column">
                     <li class="nav-item mb-2">
                         <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
@@ -143,6 +153,19 @@
                             <i class="fas fa-user-circle me-2"></i>Профіль
                         </a>
                     </li>
+
+                    {% if user.is_superuser %}
+                    <!-- Секція адміністратора (лише для суперкористувачів) -->
+                    <div class="admin-section">
+                        <h6 class="text-white-50 mb-2 ps-2">Адміністрування</h6>
+                        <li class="nav-item mb-2">
+                            <a class="nav-link admin-nav-link {% if request.resolver_match.url_name == 'manage_moderators' %}active{% endif %}" href="{% url 'manage_moderators' %}">
+                                <i class="fas fa-user-shield me-2"></i>Управління модераторами
+                            </a>
+                        </li>
+                    </div>
+                    {% endif %}
+
                     <li class="nav-item mt-5">
                         <a class="nav-link text-danger" href="{% url 'logout' %}">
                             <i class="fas fa-sign-out-alt me-2"></i>Вийти

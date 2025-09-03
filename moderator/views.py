@@ -15,25 +15,37 @@ from datetime import datetime, timedelta
 from .models import *
 from .database import db_manager, ModerationTask
 
+
 @login_required
-def profile(request):
+def profile(request, moderator_id=None):
     """Профіль модератора з його покараннями"""
-    username = request.user.username
+    # Якщо вказаний moderator_id і поточний користувач - суперкористувач
+    if moderator_id and request.user.is_superuser:
+        # Шукаємо модератора за вказаним ID
+        moderator = Moderator.objects.filter(user_id=moderator_id).first()
+        if not moderator:
+            messages.error(request, f"Модератор з ID {moderator_id} не знайдений")
+            return redirect('dashboard')
 
-    moderator = Moderator.objects.filter(username=username).first()
-    punishments = None
-
-    if moderator:
-        punishments = Punishment.objects.filter(moderator_id=moderator.user_id).order_by('-timestamp')
+        punishments = Punishment.objects.filter(moderator_id=moderator_id).order_by('-timestamp')
     else:
-        try:
-            telegram_id = int(username)
-            moderator = Moderator.objects.filter(user_id=telegram_id).first()
-            if moderator:
-                punishments = Punishment.objects.filter(moderator_id=telegram_id).order_by('-timestamp')
-        except ValueError:
-            moderator = None
-            punishments = Punishment.objects.none()
+        # Стара логіка для поточного модератора
+        username = request.user.username
+
+        moderator = Moderator.objects.filter(username=username).first()
+        punishments = None
+
+        if moderator:
+            punishments = Punishment.objects.filter(moderator_id=moderator.user_id).order_by('-timestamp')
+        else:
+            try:
+                telegram_id = int(username)
+                moderator = Moderator.objects.filter(user_id=telegram_id).first()
+                if moderator:
+                    punishments = Punishment.objects.filter(moderator_id=telegram_id).order_by('-timestamp')
+            except ValueError:
+                moderator = None
+                punishments = Punishment.objects.none()
 
     # Мапа chat_id -> chat_title
     chat_titles = {str(cs.chat_id): cs.chat_title for cs in ChatSetting.objects.all()}
@@ -42,6 +54,7 @@ def profile(request):
         'moderator': moderator,
         'punishments': punishments,
         'chat_titles': chat_titles,
+        'viewing_as_admin': moderator_id is not None and request.user.is_superuser,
     }
     return render(request, 'moderator/profile.html', context)
 

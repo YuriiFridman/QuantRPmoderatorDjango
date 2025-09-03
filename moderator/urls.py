@@ -14,6 +14,7 @@ urlpatterns = [
     path('analytics/', views.analytics, name='analytics'),
     path('settings/', views.settings_view, name='settings'),
     path('profile/', views.profile, name='profile'),
+    path('moderator-profile/<int:moderator_id>/', views.profile, name='moderator_profile'),
 
     # Адміністративні URL для управління модераторами
     path('manage-moderators/', admin_views.manage_moderators, name='manage_moderators'),

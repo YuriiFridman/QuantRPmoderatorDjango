@@ -2,6 +2,14 @@
 {% load dict_extras %}
 {% block content %}
 <h2>Профіль модератора</h2>
+{% if viewing_as_admin %}
+<div class="alert alert-info">
+    <i class="fas fa-info-circle"></i> Ви переглядаєте профіль модератора як адміністратор.
+    <a href="{% url 'manage_moderators' %}" class="btn btn-sm btn-outline-info ml-2">
+        <i class="fas fa-arrow-left"></i> Повернутися до списку модераторів
+    </a>
+</div>
+{% endif %}
 <div>
     <p><strong>ID Telegram:</strong> {{ moderator.user_id }}</p>
     <p><strong>Username:</strong> {{ moderator.username }}</p>
