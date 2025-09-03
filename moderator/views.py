@@ -6,6 +6,7 @@ from django.contrib.auth import login
 from django.conf import settings
 from django.utils import timezone
 from django.core.paginator import Paginator
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -71,6 +72,16 @@ def check_telegram_auth(querydict, bot_token):
 
     # Constant-time порівняння
     return hmac.compare_digest(my_hash, received_hash)
+
+
+@xframe_options_exempt
+def tg_login_test(request):
+    """
+    Проста сторінка для діагностики Telegram Login Widget:
+    - показуємо user-об’єкт у браузері при успішній авторизації
+    - даємо кнопку "Продовжити", яка вручну редіректить на /telegram_auth з тим самим набором параметрів
+    """
+    return render(request, 'debug/tg_login_test.html')
 
 
 @csrf_exempt
