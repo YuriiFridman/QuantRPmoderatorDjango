@@ -24,6 +24,9 @@ from datetime import datetime, timedelta  # НЕ імпортуємо `time` з�
 from .models import *
 from .database import db_manager, ModerationTask
 
+import logging
+logger = logging.getLogger(__name__)
+
 # --- Telegram Auth Widget ---
 
 TELEGRAM_BOT_TOKEN = getattr(settings, "TELEGRAM_BOT_TOKEN", None)
@@ -63,6 +66,9 @@ def check_telegram_auth(querydict, bot_token):
         # Якщо не змогли прочитати auth_date — не валимо, але краще логувати
         pass
 
+    logger.info("Checking Telegram signature: %s", data)
+    logger.info("Calculated hash: %s, Received: %s", my_hash, received_hash)
+
     # Constant-time порівняння
     return hmac.compare_digest(my_hash, received_hash)
 
@@ -70,30 +76,41 @@ def check_telegram_auth(querydict, bot_token):
 @csrf_exempt
 @require_http_methods(["GET"])
 def telegram_auth(request):
-    """Вхід через Telegram Login Widget"""
-    if not check_telegram_auth(request.GET, TELEGRAM_BOT_TOKEN):
+    logger.info("Telegram login requested: %s", request.GET.dict())
+
+    # Перевірка підпису Telegram
+    valid_signature = check_telegram_auth(request.GET, TELEGRAM_BOT_TOKEN)
+    logger.info("Signature valid: %s", valid_signature)
+    if not valid_signature:
+        logger.warning("Auth failed for data: %s", request.GET.dict())
         return HttpResponse("Auth failed", status=403)
 
-    # Після валідації підпису дістаємо поля
     try:
         telegram_id = int(request.GET.get('id', '0'))
     except (TypeError, ValueError):
+        logger.error("Could not parse telegram_id from: %s", request.GET.get('id'))
         return HttpResponse("Bad request", status=400)
+    logger.info("Parsed telegram_id: %s", telegram_id)
 
     username = request.GET.get('username')
     first_name = request.GET.get('first_name')
     last_name = request.GET.get('last_name')
+    logger.info("Username: %s, First name: %s, Last name: %s", username, first_name, last_name)
 
     moderator = Moderator.objects.filter(user_id=telegram_id).first()
+    logger.info("Moderator found: %s", bool(moderator))
     if moderator:
         from django.contrib.auth.models import User
-        user, _ = User.objects.get_or_create(username=str(telegram_id))
+        user, created = User.objects.get_or_create(username=str(telegram_id))
+        logger.info("Django User created: %s, User ID: %s", created, user.id)
         user.first_name = first_name or ""
         user.last_name = last_name or ""
         user.save()
         login(request, user)
+        logger.info("User logged in: %s", user.username)
         return redirect('profile')
     else:
+        logger.warning("Access denied for telegram_id: %s", telegram_id)
         return HttpResponse("Вам доступ заборонено", status=403)
 
 @login_required
