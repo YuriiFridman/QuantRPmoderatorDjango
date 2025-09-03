@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views
+from . import views, admin_views
 
 router = DefaultRouter()
 
@@ -13,6 +13,11 @@ urlpatterns = [
     path('analytics/', views.analytics, name='analytics'),
     path('settings/', views.settings_view, name='settings'),
     path('profile/', views.profile, name='profile'),
+
+    # Адміністративні URL для управління модераторами
+    path('manage-moderators/', admin_views.manage_moderators, name='manage_moderators'),
+    path('create-moderator/', admin_views.create_moderator, name='create_moderator'),
+    path('delete-moderator/<int:user_id>/', admin_views.delete_moderator, name='delete_moderator'),
 
     # API endpoints
     path('api/', include(router.urls)),
