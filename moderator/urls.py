@@ -13,7 +13,6 @@ urlpatterns = [
     path('analytics/', views.analytics, name='analytics'),
     path('settings/', views.settings_view, name='settings'),
     path('profile/', views.profile, name='profile'),
-    path('telegram_auth/', views.telegram_auth, name='telegram_auth'),
 
     # API endpoints
     path('api/', include(router.urls)),
@@ -22,7 +21,4 @@ urlpatterns = [
     path('chat/<str:chat_id>/settings/', views.edit_chat_settings, name='edit_chat_settings'),
     path('settings/bulk_filter/<str:action>/', views.bulk_filter_toggle, name='bulk_filter_toggle'),
 
-    path('telegram_auth/', views.telegram_auth, name='telegram_auth'),
-    path('tg-test/', views.tg_login_test, name='tg_login_test'),  # ДОДАНО: тестова сторінка
-    path('api/', include(router.urls)),
 ]

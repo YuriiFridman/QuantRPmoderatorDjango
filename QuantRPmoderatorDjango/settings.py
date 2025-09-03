@@ -8,8 +8,6 @@ import ssl
 import asyncio
 from startup import init_database
 
-import logging
-
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -110,23 +108,4 @@ REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
 REDIS_DB = config('REDIS_DB', default=0, cast=int)
 REDIS_PASSWORD = config('REDIS_PASSWORD', default='ASNzAAImcDE1MjBjNjY4OWEwNTc0M2NmOWFjYzc3OTM5ZGQ5NzZiZXAxOTA3NQ')
 
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-
 asyncio.get_event_loop().run_until_complete(init_database())
-
-
-
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'DEBUG',
-    },
-}
